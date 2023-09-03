@@ -21,6 +21,10 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -57,7 +61,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private TextView distanceTextView;
     private TextView timeTextView;
     private TextView speedTextView;
-    private TextView averageSpeedTextView;
 
     private Location previousLocation;
 
@@ -67,7 +70,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private double totalDistance = 0;
     private long startTime = 0;
     private long elapsedTime = 0;
-    double averageSpeed;
+    private LineChart speedChart;
+    private LineData speedData;
 
     String speedText;
     double speedValue; // 숫자와 소수점만 남기고 제거
@@ -111,9 +115,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         distanceTextView = findViewById(R.id.distanceTextView);
         timeTextView = findViewById(R.id.timeTextView);
         speedTextView = findViewById(R.id.speedTextView);
-        averageSpeedTextView = findViewById(R.id.averageSpeedTextView);
 
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+
+        speedChart = findViewById(R.id.speedChart);
+        speedChart.getDescription().setEnabled(false);
+        speedChart.setTouchEnabled(false);
+
+        speedData = new LineData();
+        speedChart.setData(speedData);
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -211,8 +221,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @SuppressLint("MissingPermission")
     private void startLocationUpdates() {
         LocationRequest locationRequest = LocationRequest.create();
+        // 위치 업데이트 주기
         locationRequest.setInterval(1000);
         locationRequest.setFastestInterval(1000);
+        // 위치 업데이트의 우선 순위 설정. 높은 정확성 요구 설정
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         locationCallback = new LocationCallback() {
@@ -277,41 +289,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         startTime = System.currentTimeMillis() - elapsedTime;
         handler.postDelayed(timerRunnable, 0); // 타이머 시작
     }
-    private Bitmap captureScreen() {
-        View rootView = mapView.getRootView();
-        rootView.setDrawingCacheEnabled(true);
-        Bitmap screenshotBitmap = Bitmap.createBitmap(rootView.getDrawingCache());
-        rootView.setDrawingCacheEnabled(false);
-
-        // 압축 수준 설정
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        screenshotBitmap.compress(Bitmap.CompressFormat.PNG, 10, outputStream);
-        byte[] bitmapData = outputStream.toByteArray();
-
-        // 압축된 데이터로 다시 비트맵 생성
-        Bitmap compressedBitmap = BitmapFactory.decodeByteArray(bitmapData, 0, bitmapData.length);
-
-        return compressedBitmap;
-    }
-
-    private String saveBitmapToFile(Bitmap bitmap) {
-        // 비트맵을 파일로 저장
-        File file = new File(getCacheDir(), "screenshot.png");
-        try {
-            FileOutputStream fos = new FileOutputStream(file);
-            bitmap.compress(Bitmap.CompressFormat.PNG, 80, fos);
-            fos.flush();
-            fos.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return file.getAbsolutePath();
-    }
 
     private void stopTracking() {
         Intent intent = new Intent(this, MainActivity.class);
-        intent.putExtra("screenshot_path", saveBitmapToFile((captureScreen())));
+        //intent.putExtra("screenshot_path", saveBitmapToFile((captureScreen())));
         startActivity(intent);
         button.setText("시작");
         stopButton.setVisibility(View.GONE); // 종료 버튼 숨기기
@@ -339,7 +320,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             PolylineOptions polylineOptions = new PolylineOptions()
                     .add(previousLatLng, latLng)
-                    .color(Color.parseColor("#FF6200EE"))
+                    .color(Color.parseColor("#FF6200EE")) // polyline 색을 보라색으로
                     .width(10);
             pathPolyline = googleMap.addPolyline(polylineOptions);
 
@@ -363,13 +344,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void updateUI(Location location) {
         if (location != null) {
+            // 소수점 두자리 수까지 나타나게 숫자 포맷 설정
             DecimalFormat decimalFormat = new DecimalFormat("#.##");
-            double speed = location.getSpeed() * 3.6; // m/s to km/h
-            averageSpeed = totalDistance / (elapsedTime / 1000.0) * 3.6; // m/s to km/h
+            double speed = location.getSpeed() * 3.6; // m/s -> km/h
 
             distanceTextView.setText(decimalFormat.format(totalDistance / 1000) + " km");
             speedTextView.setText(decimalFormat.format(speed) + " km/h");
-            averageSpeedTextView.setText(decimalFormat.format(averageSpeed) + " km/h");
 
             speedText = speedTextView.getText().toString();
             speedValue = Double.parseDouble(speedText.replaceAll("[^\\d.]", "")); // 숫자와 소수점만 남기고 제거
@@ -377,11 +357,21 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 // 40를 넘으면 "차량 탑승!!!!" 메시지를 Toast로 띄움
                 Toast.makeText(MainActivity.this, "!!!!!! 차량 탑승 !!!!!", Toast.LENGTH_LONG).show();
             }
+            // 속도 그래프에 데이터 추가
+            LineDataSet speedDataSet = (LineDataSet) speedData.getDataSetByIndex(0);
+            if (speedDataSet == null) {
+                speedDataSet = createSpeedDataSet();
+                speedData.addDataSet(speedDataSet);
+            }
+
+            speedData.addEntry(new Entry(speedDataSet.getEntryCount(), (float) speed), 0);
+            speedData.notifyDataChanged();
+            speedChart.notifyDataSetChanged();
+            speedChart.invalidate();
         } else {
             distanceTextView.setText("0 km");
             timeTextView.setText("00:00:00");
             speedTextView.setText("0 km/h");
-            averageSpeedTextView.setText("0 km/h");
         }
     }
 
@@ -394,4 +384,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         }
     }
+    private LineDataSet createSpeedDataSet() {
+        LineDataSet dataSet = new LineDataSet(null, "속도 (km/h)");
+        dataSet.setDrawCircles(false);
+        dataSet.setDrawValues(false);
+        dataSet.setColor(Color.BLUE);
+        dataSet.setLineWidth(2f);
+        return dataSet;
+    }
+
 }

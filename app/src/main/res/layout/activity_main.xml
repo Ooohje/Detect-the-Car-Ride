@@ -21,7 +21,10 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/speedChart"
+            android:layout_width="match_parent"
+            android:layout_height="150dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -93,23 +96,14 @@
                 android:id="@+id/speedLabelTextView"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="2"
                 android:text="현재 속력"
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:gravity="center"
                 android:textColor="#000000" />
 
-            <TextView
-                android:id="@+id/averageSpeedLabelTextView"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="평균 속력"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:gravity="center"
-                android:textColor="#000000" />
+
 
         </LinearLayout>
 
@@ -123,18 +117,7 @@
                 android:id="@+id/speedTextView"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="0 km/h"
-                android:textSize="30sp"
-                android:textStyle="bold"
-                android:gravity="center"
-                android:textColor="#000000" />
-
-            <TextView
-                android:id="@+id/averageSpeedTextView"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_weight="2"
                 android:text="0 km/h"
                 android:textSize="30sp"
                 android:textStyle="bold"
